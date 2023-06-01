@@ -137,6 +137,8 @@ public class RTree {
 	        
 	        splitNode1.setRoditeljRegion(reg1);
 	        splitNode2.setRoditeljRegion(reg2);
+	        splitNode1.setRoditeljNode(parentNode);
+	        splitNode2.setRoditeljNode(parentNode);
 	        
 	        if (parentNode.getRegioni().size() > M) {
 	            List<Node> splitNodes = splitObican(parentNode);
@@ -203,6 +205,16 @@ public class RTree {
 				}
 			}
 		}
+		for(int i = 0; i < newNode1.getRegioni().size(); i++) {
+			newNode1.getRegioni().get(i).getPotomak().setRoditeljNode(newNode1);
+			newNode1.getRegioni().get(i).getPotomak().setRoditeljRegion(newNode1.getRegioni().get(i));
+		}
+		
+		for(int i = 0; i < newNode2.getRegioni().size(); i++) {
+			newNode2.getRegioni().get(i).getPotomak().setRoditeljNode(newNode2);
+			newNode2.getRegioni().get(i).getPotomak().setRoditeljRegion(newNode2.getRegioni().get(i));
+		}
+		
 		List<Node> splitNodes = new ArrayList<>();
 		splitNodes.add(newNode1);
 		splitNodes.add(newNode2);
