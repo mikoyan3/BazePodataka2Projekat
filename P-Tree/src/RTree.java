@@ -1,5 +1,8 @@
 import java.util.List;
 import java.util.ArrayList;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 
 public class RTree {
 	private int M;
@@ -14,11 +17,11 @@ public class RTree {
 	
 	public List<Region> rangeSearch(Region region){
 		List<Region> rezultat = new ArrayList<>();
-		loop(rezultat, region, root);
+		search(rezultat, region, root);
 		return rezultat;
 	}
 	
-	public void loop(List<Region> rezultat, Region region, Node node) {
+	public void search(List<Region> rezultat, Region region, Node node) {
 		if(node.isLeaf() == true) {
 			for(int i = 0; i < node.getRegioni().size(); i++) {
 				if(node.getRegioni().get(i).contains(region)) {
@@ -33,24 +36,24 @@ public class RTree {
 				}
 			}
 			for(int i = 0; i < sadrzeIliPresecaju.size(); i++) {
-				loop(rezultat, region, sadrzeIliPresecaju.get(i).getPotomak());
+				search(rezultat, region, sadrzeIliPresecaju.get(i).getPotomak());
 			}
 		}
 	}
 	
 	public void insert(Point point) {
 		Region region = new Region(point, point, null);
-		Node leafNode = chooseLeaf(region);
+		Node leafNode = izaberiList(region);
 		if(leafNode.getRegioni().size() < M) {
 			leafNode.getRegioni().add(region);
-			update(root, leafNode, region);
+			update(leafNode, region);
 		} else {
-			List<Node> splitNodes = splitLeafNode(leafNode, region);
-			adjustTree(root, splitNodes.get(0), splitNodes.get(1));
+			List<Node> splitNodes = splitList(leafNode, region);
+			adjust(splitNodes.get(0), splitNodes.get(1));
 		}
 	}
 	
-	private Node chooseLeaf(Region region) {
+	private Node izaberiList(Region region) {
 		Node node = root;
 		while(node.isLeaf() != true) {
 			double minimum = Double.MAX_VALUE;
@@ -74,8 +77,8 @@ public class RTree {
 		return node;
 	}
 	
-	public void update(Node rootNode, Node leafNode, Region region) {
-		if(rootNode != leafNode) {
+	public void update(Node leafNode, Region region) {
+		if(root != leafNode) {
 			Node node = leafNode;
 			while (node != null) {
 				Region roditeljRegion = node.getRoditeljRegion();
@@ -87,7 +90,7 @@ public class RTree {
 		}
 	}
 	
-	public Region[] selectSeeds(List<Region> regioni) {
+	public Region[] izaberiSeeds(List<Region> regioni) {
 		Region[] seeds = new Region[2];
 		double maximum = Double.MIN_VALUE;
 		
@@ -116,26 +119,33 @@ public class RTree {
 		return unionArea - area1 - area2;
 	}
 	
-	private void adjustTree(Node rootNode, Node splitNode1, Node splitNode2) {
-		if(splitNode1 == rootNode) {
-			rootNode = createNewRootNode(splitNode1, splitNode2);
+	private void adjust(Node splitNode1, Node splitNode2) {
+		if(splitNode1 == root || splitNode2 == root) {
+			root = napraviKoren(splitNode1, splitNode2);
 		} else if (splitNode1.getRoditeljRegion() == null || splitNode2.getRoditeljRegion() == null){
-			root = createNewRootNode(splitNode1, splitNode2);
+			root = napraviKoren(splitNode1, splitNode2);
 		} else {
-			Node roditeljNode = splitNode1.getRoditeljNode();
-			roditeljNode.getRegioni().remove(splitNode1.getRoditeljRegion());
-			Region reg1 = new Region(splitNode1.getRegioni(), splitNode1);
-			Region reg2 = new Region(splitNode2.getRegioni(), splitNode2);
-			roditeljNode.getRegioni().add(reg1);
-			roditeljNode.getRegioni().add(reg2);
-			if(roditeljNode.getRegioni().size() > M) {
-				List<Node> splitNodes = splitNonLeafNode(roditeljNode);
-				adjustTree(roditeljNode, splitNodes.get(0), splitNodes.get(1));
-			}
+			Node parentNode = splitNode1.getRoditeljNode();
+	        Region parentRegion = splitNode1.getRoditeljRegion();
+	        parentNode.getRegioni().remove(parentRegion);
+
+	        Region reg1 = new Region(splitNode1.getRegioni(), splitNode1);
+	        Region reg2 = new Region(splitNode2.getRegioni(), splitNode2);
+
+	        parentNode.getRegioni().add(reg1);
+	        parentNode.getRegioni().add(reg2);
+	        
+	        splitNode1.setRoditeljRegion(reg1);
+	        splitNode2.setRoditeljRegion(reg2);
+	        
+	        if (parentNode.getRegioni().size() > M) {
+	            List<Node> splitNodes = splitObican(parentNode);
+	            adjust(splitNodes.get(0), splitNodes.get(1));
+	        }
 		}
 	}
 	
-	private Node createNewRootNode(Node node1, Node node2) {
+	private Node napraviKoren(Node node1, Node node2) {
 		Node rootNode = new Node(false, null, null);
 		Region reg1 = new Region(node1.getRegioni(), node1);
 		Region reg2 = new Region(node2.getRegioni(), node2);
@@ -149,11 +159,11 @@ public class RTree {
 	}
 	
 	
-	private List<Node> splitNonLeafNode(Node node){
+	private List<Node> splitObican(Node node){
 		List<Region> regioni = node.getRegioni();
-		Region[] seeds = selectSeeds(regioni);
-		Node newNode1 = new Node(true, node.getRoditeljRegion(), node.getRoditeljNode());
-		Node newNode2 = new Node(true, node.getRoditeljRegion(), node.getRoditeljNode());
+		Region[] seeds = izaberiSeeds(regioni);
+		Node newNode1 = new Node(false, node.getRoditeljRegion(), node.getRoditeljNode());
+		Node newNode2 = new Node(false, node.getRoditeljRegion(), node.getRoditeljNode());
 		newNode1.getRegioni().add(seeds[0]);
 		newNode2.getRegioni().add(seeds[1]);
 		regioni.remove(seeds[0]);
@@ -201,12 +211,12 @@ public class RTree {
 		
 	}
 	
-	public List<Node> splitLeafNode(Node leafNode, Region region){ //region pa node
+	public List<Node> splitList(Node leafNode, Region region){ //region pa node
 		Node newLeaf1 = new Node(true, leafNode.getRoditeljRegion(), leafNode.getRoditeljNode());
 		Node newLeaf2 = new Node(true, leafNode.getRoditeljRegion(), leafNode.getRoditeljNode());
 		List<Region> regioni = new ArrayList<>(leafNode.getRegioni());
 		regioni.add(region);
-		Region[] seeds = selectSeeds(regioni);
+		Region[] seeds = izaberiSeeds(regioni);
 		newLeaf1.getRegioni().add(seeds[0]);
 		newLeaf2.getRegioni().add(seeds[1]);
 		
@@ -257,20 +267,17 @@ public class RTree {
 	}
 	
 	public void printTree() {
-	    System.out.println("R-Tree contents:");
+	    System.out.println("Stablo:");
 
-	    // Start recursive printing
 	    printNode(root, 0);
 	}
 
 	private void printNode(Node node, int level) {
 	    if (node.isLeaf() == true) {
-	        // Print leaf node's points
 	        Node leafNode = node;
-	        for (Region entry : leafNode.getRegioni()) {
+	        for (Region entry : leafNode.getRegioni()) { // ovo su tacke tako da nema potrebe da vadim oba Point
 	            Point point1 = entry.getTopLeft();
-	            Point point2 = entry.getBottomRight();
-	            System.out.println(getIndentation(level) + "Point: (" + point1.getX() + ", " + point1.getY() + ")");
+	            System.out.println(getIndentation(level) + "Tacka: (" + point1.getX() + ", " + point1.getY() + ")");
 	        }
 	    } else {
 	    	for(int i = 0; i < node.getRegioni().size(); i++) {
@@ -285,9 +292,25 @@ public class RTree {
 	private String getIndentation(int level) {
 	    StringBuilder indentation = new StringBuilder();
 	    for (int i = 0; i < level; i++) {
-	        indentation.append("  "); // Two spaces per level
+	        indentation.append("  "); 
 	    }
 	    return indentation.toString();
 	}
 
+	public void ucitajIzFajla(String filePath) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] coordinates = line.split(",");
+                if (coordinates.length == 2) {
+                    double x = Double.parseDouble(coordinates[0].trim());
+                    double y = Double.parseDouble(coordinates[1].trim());
+                    Point point = new Point(x, y);
+                    insert(point);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
